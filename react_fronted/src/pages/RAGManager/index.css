@@ -1,0 +1,91 @@
+/**
+ * RAG 管理页面样式
+ */
+
+.rag-manager {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  padding-bottom: 60px;
+}
+
+.rag-content {
+  padding: 12px;
+}
+
+.rag-card {
+  margin-bottom: 12px;
+  border-radius: 8px;
+}
+
+/* 统计信息 */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 24px;
+  font-weight: bold;
+  color: #1890ff;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #999;
+}
+
+/* 文档操作 */
+.document-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* 文档列表 */
+.document-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.document-icon {
+  font-size: 24px;
+}
+
+.document-name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+/* 配置项 */
+.config-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+/* 支持格式 */
+.supported-formats {
+  text-align: center;
+  padding: 16px;
+  color: #999;
+  font-size: 12px;
+}
+
+/* 响应式 */
+@media (min-width: 768px) {
+  .rag-content {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+}

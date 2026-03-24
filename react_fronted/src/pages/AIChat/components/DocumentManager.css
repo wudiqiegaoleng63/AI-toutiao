@@ -1,0 +1,103 @@
+/**
+ * 文档管理组件样式
+ */
+
+/* 容器 */
+.document-manager {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+}
+
+/* 头部 */
+.document-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.document-manager-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.document-manager-header .adm-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 说明 */
+.document-manager-hint {
+  font-size: 13px;
+  color: #999;
+  background-color: #f5f5f5;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+/* 文档列表 */
+.document-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* 文档图标 */
+.document-icon {
+  font-size: 24px;
+}
+
+/* 文档名称 */
+.document-name {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #333;
+}
+
+/* 文档元数据 */
+.document-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #999;
+}
+
+/* 空状态 */
+.document-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.document-empty p {
+  margin: 10px 0 0;
+  font-size: 14px;
+}
+
+.document-empty-hint {
+  font-size: 12px !important;
+  color: #bbb;
+}
+
+/* 列表项样式 */
+.document-list .adm-list-item {
+  padding-left: 0;
+}
+
+.document-list .adm-list-item-content {
+  padding: 12px 0;
+}
+
+/* 上传按钮 */
+.document-manager-header .adm-button {
+  --border-radius: 16px;
+}

@@ -1,0 +1,76 @@
+.my-page {
+  padding-top: 46px;
+  padding-bottom: 50px;
+  background-color: #f7f8fa;
+  min-height: 100vh;
+}
+
+.my-page .adm-nav-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-width: 750px;
+  margin: 0 auto;
+  z-index: 100;
+}
+
+.user-section {
+  background-color: #fff;
+  padding: 20px 16px;
+  margin-bottom: 12px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.user-detail {
+  flex: 1;
+  margin-left: 16px;
+}
+
+.username {
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
+}
+
+.bio {
+  font-size: 14px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.login-prompt {
+  display: flex;
+  align-items: center;
+}
+
+.login-actions {
+  flex: 1;
+  margin-left: 16px;
+  display: flex;
+  gap: 12px;
+}
+
+.menu-list {
+  margin-top: 12px;
+}
+
+.menu-list .adm-list-item {
+  padding: 16px;
+}
+
+.logout-section {
+  padding: 20px 16px;
+}
+
+.logout-section .adm-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}

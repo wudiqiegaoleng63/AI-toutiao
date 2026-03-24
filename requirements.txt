@@ -1,0 +1,37 @@
+# FastAPI 核心
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+
+# 数据库
+aiomysql>=0.2.0
+PyMySQL>=1.1.0
+SQLAlchemy>=2.0.0
+
+# 环境变量
+python-dotenv>=1.0.0
+
+# LangChain
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+langchain-ollama>=0.1.0
+
+# 向量数据库
+chromadb>=0.5.0
+rank-bm25>=0.2.2
+
+# 模型相关
+sentence-transformers>=3.0.0
+transformers>=4.40.0
+torch>=2.0.0
+
+# 文档处理
+pypdf>=4.0.0
+python-docx>=1.1.0
+unstructured>=0.14.0
+
+# 其他
+aiofiles>=23.0.0
+redis>=5.0.0

@@ -1,0 +1,15 @@
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: 750px;
+  margin: 0 auto;
+  background-color: #fff;
+  border-top: 1px solid #eee;
+  z-index: 1000;
+}
+
+.tab-bar .adm-tab-bar {
+  height: 50px;
+}

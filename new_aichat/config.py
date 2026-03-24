@@ -1,0 +1,5 @@
+OLLAMA_BASE_URL = "http://localhost:11434/v1"
+OLLAMA_API_KEY = "ollama"
+LLM_MODEL_NAME = "qwen3-vl:2b"
+EMBEDDING_MODEL_NAME = "qwen3-embedding:0.6b"
+CHROMA_PERSIST_DIR = "./chroma_db"

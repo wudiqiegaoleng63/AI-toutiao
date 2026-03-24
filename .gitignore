@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 环境变量
+.env
+.env.local
+
+# 无用文件
+unuse/
+
+# 向量数据库
+chroma_db/
+
+# 下载的模型缓存
+models/models/
+
+# 日志
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 前端
+react_fronted/dist/
+react_fronted/node_modules/
+react_fronted/package-lock.json
+
+# 临时文件
+DEV_CHAT_LOG.md
+RAG_EVALUATION_REPORT.md
+.claude
+.env.example

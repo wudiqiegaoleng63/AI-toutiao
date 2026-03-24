@@ -1,0 +1,30 @@
+.settings-page {
+  padding-top: 46px;
+  background-color: #f7f8fa;
+  min-height: 100vh;
+}
+
+.settings-page .adm-nav-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-width: 750px;
+  margin: 0 auto;
+  z-index: 100;
+}
+
+.settings-list {
+  margin-top: 12px;
+}
+
+.settings-list .adm-list-item {
+  padding: 16px;
+}
+
+.settings-list .value {
+  float: right;
+  color: #999;
+  font-size: 14px;
+  margin-right: 8px;
+}
