@@ -67,7 +67,7 @@ toutiao_backend/
 │   ├── favorite.py
 │   └── history.py
 ├── utils/                  # 工具函数
-│   ├── auth.py            # JWT 认证
+│   ├── auth.py            # token 认证
 │   ├── security.py        # 密码加密
 │   ├── response.py        # 统一响应
 │   └── exception.py       # 异常定义
