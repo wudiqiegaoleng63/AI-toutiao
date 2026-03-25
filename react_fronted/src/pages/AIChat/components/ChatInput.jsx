@@ -187,7 +187,18 @@ const ChatInput = () => {
     let buffer = ''
     let aiResponse = ''
     let thinkingContent = ''
-    let isThinking = false
+
+    // 节流更新：减少 dispatch 频率，让 UI 有时间渲染
+    let lastUpdateTime = 0
+    const UPDATE_INTERVAL = 16 // 约 60fps
+
+    const throttledUpdate = (content, thinking) => {
+      const now = Date.now()
+      if (now - lastUpdateTime >= UPDATE_INTERVAL) {
+        dispatch(updateLastMessage({ content, thinking }))
+        lastUpdateTime = now
+      }
+    }
 
     while (true) {
       const { done, value } = await reader.read()
@@ -198,62 +209,34 @@ const ChatInput = () => {
       buffer = lines.pop() || ''
 
       for (const line of lines) {
-        // 处理 session_id 事件
+        if (!line.trim()) continue
+
         if (line.startsWith('session_id:')) {
           const sessionId = parseInt(line.slice(11).trim())
           if (sessionId && !currentConversationId) {
             dispatch(setCurrentConversation(sessionId))
           }
         }
-        // 思考开始
-        else if (line.startsWith('think_start:')) {
-          isThinking = true
-          thinkingContent = ''
-        }
-        // 思考结束
-        else if (line.startsWith('think_end:')) {
-          isThinking = false
-          // 更新消息，包含思考内容
-          dispatch(
-            updateLastMessage({
-              content: aiResponse,
-              thinking: thinkingContent
-            })
-          )
-        }
-        // 思考内容
         else if (line.startsWith('think:')) {
-          const content = line.slice(6)
-          thinkingContent += content
-          dispatch(
-            updateLastMessage({
-              content: aiResponse,
-              thinking: thinkingContent
-            })
-          )
+          thinkingContent += line.slice(6)
+          throttledUpdate(aiResponse, thinkingContent)
         }
-        // 正文内容
         else if (line.startsWith('data:')) {
           const content = line.slice(5)
-          if (content.trim()) {
+          if (content) {
             aiResponse += content
-            dispatch(
-              updateLastMessage({
-                content: aiResponse,
-                thinking: thinkingContent
-              })
-            )
+            throttledUpdate(aiResponse, thinkingContent)
           }
         }
+        // think_start 和 think_end 不需要特殊处理
       }
     }
 
+    // 最终更新，确保显示完整内容
+    dispatch(updateLastMessage({ content: aiResponse, thinking: thinkingContent }))
+
     if (!aiResponse) {
-      dispatch(
-        updateLastMessage({
-          content: '抱歉，没有收到回复，请稍后重试。'
-        })
-      )
+      dispatch(updateLastMessage({ content: '抱歉，没有收到回复，请稍后重试。' }))
     }
   }
 
@@ -303,29 +286,27 @@ const ChatInput = () => {
             color={chatMode === 'normal' ? 'primary' : 'default'}
             onClick={() => setChatMode('normal')}
           >
-            普通模式
+            普通聊天
           </Button>
           <Button
             size="small"
             color={chatMode === 'advanced' ? 'primary' : 'default'}
             onClick={() => setChatMode('advanced')}
           >
-            高级RAG
+            高级模式
           </Button>
         </div>
 
-        {/* 普通模式显示 RAG 开关 */}
-        {chatMode === 'normal' && (
-          <div className="rag-toggle">
-            <GlobalOutline fontSize={16} />
-            <span className="rag-label">联网搜索</span>
-            <Switch
-              checked={useRag}
-              onChange={setUseRag}
-              style={{ '--checked-color': '#1890ff' }}
-            />
-          </div>
-        )}
+        {/* RAG 开关 - 所有模式都显示 */}
+        <div className="rag-toggle">
+          <GlobalOutline fontSize={16} />
+          <span className="rag-label">知识库检索</span>
+          <Switch
+            checked={useRag}
+            onChange={setUseRag}
+            style={{ '--checked-color': '#1890ff' }}
+          />
+        </div>
       </div>
 
       {/* 已选择的文件 */}

@@ -15,7 +15,7 @@ load_dotenv()
 # 从环境变量读取模型路径
 RERANKER_MODEL_PATH = os.getenv(
     'RERANKER_MODEL_PATH',
-    r"C:\Users\li\Desktop\qwen_model\qwen\Qwen\Qwen3-Reranker-0___6B"
+    r"E:\qwen\Qwen3-Reranker-0___6B"
 )
 
 

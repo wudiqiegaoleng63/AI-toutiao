@@ -3,7 +3,6 @@ from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 from .vectorstore import search_similar
 from .reranker import get_reranker
 from .hybrid_search import get_hybrid_search
@@ -12,16 +11,22 @@ from .hybrid_search import get_hybrid_search
 load_dotenv()
 
 # 从环境变量读取配置
-OLLAMA_API_KEY = os.getenv('OLLAMA_API_KEY', '')
-OLLAMA_BASE_URL = os.getenv('DASHSCOPE_BASE_UR', 'http://localhost:11434/v1')
+OLLAMA_API_KEY = os.getenv('OLLAMA_API_KEY', 'ollama')
+OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434/v1')
 
+# 推理参数配置
+reasoning = {
+    "effort": "medium",  # 'low', 'medium', or 'high'
+    "summary": "auto",   # 'detailed', 'auto', or None
+}
 
-# 初始化 LLM
+# 初始化 LLM（支持推理模型）
 qwen_llm = ChatOpenAI(
-    model="qwen3-vl:2b",
-    base_url=OLLAMA_BASE_URL,
+    model='qwen3-vl:2b',
     api_key=OLLAMA_API_KEY,
-    temperature=0.2
+    base_url=OLLAMA_BASE_URL,
+    reasoning=reasoning,
+    output_version="responses/v1"
 )
 
 
@@ -44,10 +49,11 @@ async def rewrite_query(question: str, history: Optional[HistoryType] = None):
         ("user", "对话历史：\n{history}\n\n用户问题：{question}\n\n重写后的问题：")
     ])
     llm = get_llm()
-    chain = prompt | llm | StrOutputParser()
+    chain = prompt | llm
 
-    rewritten = chain.invoke({"history": history_text, "question": question})
-    return rewritten.strip()
+    result = await chain.ainvoke({"history": history_text, "question": question})
+    return result.content.strip()
+
 
 
 # 系统提示词（有上下文时使用）
@@ -64,125 +70,163 @@ RAG_SYSTEM_PROMPT = """根据以下新闻内容回答问题，要求：
 CHAT_SYSTEM_PROMPT = "你是一个友好的 AI 助手，请用中文回答问题。"
 
 
-def chat(question: str, history: Optional[HistoryType] = None) -> str:
-    """简单聊天（不使用 RAG 检索）"""
-    message = [("system", CHAT_SYSTEM_PROMPT)]
-    if history:
-        message.extend(history)
-    message.append(("user", "{question}"))
+def _process_stream_chunk(chunk):
+    """
+    处理流式响应块，提取思考和回答内容
 
-    prompt = ChatPromptTemplate.from_messages(message)
-    llm = get_llm()
-    chain = prompt | llm | StrOutputParser()
+    返回: {"thinking": str, "data": str}
+    """
+    result = {"thinking": "", "data": ""}
 
-    result = chain.invoke({"question": question})
+    if not hasattr(chunk, 'content') or not chunk.content:
+        return result
+
+    for block in chunk.content:
+        if isinstance(block, dict):
+            block_type = block.get("type", "")
+            if block_type == "reasoning":
+                # 思考过程
+                for summary in block.get("summary", []):
+                    text = summary.get("text", "")
+                    if text:
+                        result["thinking"] += text
+            elif block_type == "text":
+                # 回答内容
+                text = block.get("text", "")
+                if text:
+                    result["data"] += text
+        elif hasattr(block, "text"):
+            # 兼容普通文本块
+            text = getattr(block, "text", "")
+            if text:
+                result["data"] += text
+
     return result
 
 
-def rag_chat(question: str, k: int = 2, history: Optional[HistoryType] = None) -> dict:
+def _extract_answer(result):
+    """从 LLM 结果中提取回答内容（过滤思考过程）"""
+    answer = ""
+    for block in result.content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            answer += block.get("text", "")
+        elif hasattr(block, "text"):
+            answer += getattr(block, "text", "")
+    return answer
+
+
+# ==================== 统一聊天接口 ====================
+
+async def stream_chat(
+    question: str,
+    use_rag: bool = True,
+    k: int = 2,
+    history: Optional[HistoryType] = None
+):
     """
-    RAG 聊天（先检索再回答）
+    流式聊天 - 统一接口
 
     参数:
         question: 用户问题
-        k: 检索数量
-
-    返回:
-        {"answer": "AI回复", "sources": [检索到的文档列表]}
+        use_rag: 是否使用 RAG 检索（默认 True）
+        k: 检索数量（RAG 模式有效）
+        history: 对话历史
     """
-    docs = search_similar(query=question, k=k)
+    docs = []
 
-    context = "\n\n---\n\n".join([
-        f"检索的相关新闻信息{doc.page_content}" for doc in docs
-    ])
+    if use_rag:
+        # RAG 模式：先检索
+        docs = search_similar(query=question, k=k)
+        context = "\n\n---\n\n".join([
+            f"检索的相关新闻信息{doc.page_content}" for doc in docs
+        ])
+        system_prompt = RAG_SYSTEM_PROMPT
+    else:
+        # 普通模式
+        context = ""
+        system_prompt = CHAT_SYSTEM_PROMPT
 
-    messages = [("system", RAG_SYSTEM_PROMPT)]
-    if history:
-        messages.extend(history)
-    messages.append(("user", "{question}"))
-
-    rag_prompt = ChatPromptTemplate.from_messages(messages)
-    llm = get_llm()
-    chain = rag_prompt | llm | StrOutputParser()
-
-    res = chain.invoke({"context": context, "question": question})
-
-    return {"answer": res, "sources": docs}
-
-
-async def stream_chat(question: str, history: Optional[HistoryType] = None):
-    """流式聊天"""
-    messages = [("system", CHAT_SYSTEM_PROMPT)]
+    messages = [("system", system_prompt)]
     if history:
         messages.extend(history)
     messages.append(("user", "{question}"))
 
     prompt = ChatPromptTemplate.from_messages(messages)
     llm = get_llm()
-    chain = prompt | llm | StrOutputParser()
+    chain = prompt | llm
 
     in_thinking = False
-    async for chunk in chain.astream({"question": question}):
-        if '<tool_call>' in chunk:
-            in_thinking = True
-            yield "think_start:"
-            chunk = chunk.replace('<tool_call>', '')
 
-        if in_thinking and '*/}' in chunk:
-            in_thinking = False
-            chunk = chunk.replace('*/}', '')
-            if chunk.strip():
-                yield f"think:{chunk}"
-            yield "think_end:"
-            continue
+    async for chunk in chain.astream({"question": question, "context": context}):
+        parsed = _process_stream_chunk(chunk)
 
-        if in_thinking:
-            if chunk.strip():
-                yield f"think:{chunk}"
-        else:
-            if chunk.strip():
-                yield f"data:{chunk}"
+        # 处理思考内容
+        if parsed["thinking"]:
+            if not in_thinking:
+                yield "think_start:"
+                in_thinking = True
+            yield f"think:{parsed['thinking']}"
+
+        # 处理回答内容
+        if parsed["data"]:
+            if in_thinking:
+                yield "think_end:"
+                in_thinking = False
+            yield f"data:{parsed['data']}"
+
+    # 确保思考结束标签
+    if in_thinking:
+        yield "think_end:"
 
 
-async def stream_rag_chat(question: str, k: int = 2, history: Optional[HistoryType] = None):
-    """流式 RAG 聊天"""
-    docs = search_similar(query=question, k=k)
+def chat(
+    question: str,
+    use_rag: bool = True,
+    k: int = 2,
+    history: Optional[HistoryType] = None
+) -> dict:
+    """
+    聊天 - 统一接口
 
-    context = "\n\n---\n\n".join([
-        f"检索的相关新闻信息{doc.page_content}" for doc in docs
-    ])
+    参数:
+        question: 用户问题
+        use_rag: 是否使用 RAG 检索（默认 True）
+        k: 检索数量（RAG 模式有效）
+        history: 对话历史
 
-    messages = [("system", RAG_SYSTEM_PROMPT)]
+    返回:
+        {"answer": "AI回复", "sources": [文档列表]}
+    """
+    docs = []
+
+    if use_rag:
+        # RAG 模式：先检索
+        docs = search_similar(query=question, k=k)
+        context = "\n\n---\n\n".join([
+            f"检索的相关新闻信息{doc.page_content}" for doc in docs
+        ])
+        system_prompt = RAG_SYSTEM_PROMPT
+    else:
+        # 普通模式
+        context = ""
+        system_prompt = CHAT_SYSTEM_PROMPT
+
+    messages = [("system", system_prompt)]
     if history:
         messages.extend(history)
     messages.append(("user", "{question}"))
 
-    rag_prompt = ChatPromptTemplate.from_messages(messages)
+    prompt = ChatPromptTemplate.from_messages(messages)
     llm = get_llm()
-    chain = rag_prompt | llm | StrOutputParser()
+    chain = prompt | llm
 
-    in_thinking = False
-    async for chunk in chain.astream({"question": question, "context": context}):
-        if '<tool_call>' in chunk:
-            in_thinking = True
-            yield "think_start:"
-            chunk = chunk.replace('<tool_call>', '')
+    result = chain.invoke({"context": context, "question": question})
+    answer = _extract_answer(result)
 
-        if in_thinking and '*/}' in chunk:
-            in_thinking = False
-            chunk = chunk.replace('*/}', '')
-            if chunk.strip():
-                yield f"think:{chunk}"
-            yield "think_end:"
-            continue
+    return {"answer": answer, "sources": docs}
 
-        if in_thinking:
-            if chunk.strip():
-                yield f"think:{chunk}"
-        else:
-            if chunk.strip():
-                yield f"data:{chunk}"
 
+# ==================== 高级 RAG 接口 ====================
 
 async def advanced_rag_chat(
     question: str,
@@ -238,9 +282,10 @@ async def advanced_rag_chat(
 
     prompt = ChatPromptTemplate.from_messages(messages)
     llm = get_llm()
-    chain = prompt | llm | StrOutputParser()
+    chain = prompt | llm
 
-    answer = chain.invoke({"context": context, "question": question})
+    result = chain.invoke({"context": context, "question": question})
+    answer = _extract_answer(result)
 
     return {
         "answer": answer,
@@ -290,26 +335,37 @@ async def advanced_rag_stream(
 
     prompt = ChatPromptTemplate.from_messages(messages)
     llm = get_llm()
-    chain = prompt | llm | StrOutputParser()
+    chain = prompt | llm
 
     in_thinking = False
+
     async for chunk in chain.astream({'context': context, 'question': question}):
-        if '<tool_call>' in chunk:
-            in_thinking = True
-            yield "think_start:"
-            chunk = chunk.replace('<tool_call>', '')
+        parsed = _process_stream_chunk(chunk)
 
-        if in_thinking and '*/}' in chunk:
-            in_thinking = False
-            chunk = chunk.replace('*/}', '')
-            if chunk.strip():
-                yield f"think:{chunk}"
-            yield "think_end:"
-            continue
+        if parsed["thinking"]:
+            if not in_thinking:
+                yield "think_start:"
+                in_thinking = True
+            yield f"think:{parsed['thinking']}"
 
-        if in_thinking:
-            if chunk.strip():
-                yield f"think:{chunk}"
-        else:
-            if chunk.strip():
-                yield f"data:{chunk}"
+        if parsed["data"]:
+            if in_thinking:
+                yield "think_end:"
+                in_thinking = False
+            yield f"data:{parsed['data']}"
+
+    if in_thinking:
+        yield "think_end:"
+
+
+# ==================== 兼容性别名 ====================
+# 保留旧函数名以兼容现有代码
+
+async def stream_rag_chat(question: str, k: int = 2, history: Optional[HistoryType] = None):
+    """兼容性别名 - 使用 stream_chat(use_rag=True)"""
+    return stream_chat(question, use_rag=True, k=k, history=history)
+
+
+def rag_chat(question: str, k: int = 2, history: Optional[HistoryType] = None) -> dict:
+    """兼容性别名 - 使用 chat(use_rag=True)"""
+    return chat(question, use_rag=True, k=k, history=history)

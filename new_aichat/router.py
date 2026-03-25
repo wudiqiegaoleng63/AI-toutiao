@@ -7,7 +7,7 @@ from .services.session import create_session, get_session_messages, get_user_ses
 from config.db_conf import get_db
 from utils.auth import get_current_user
 from models.users import User
-from .services.rag import rag_chat, chat as simple_chat, stream_chat as simple_stream_chat, stream_rag_chat, advanced_rag_chat, advanced_rag_stream
+from .services.rag import chat, stream_chat, advanced_rag_chat, advanced_rag_stream
 from .services.documents_loader import load_and_split, get_file_type
 from .services.multimodal import get_multimodal_chat
 from .services.vectorstore import (
@@ -196,13 +196,14 @@ async def set_chat(
             session_id = session.id
             history = None
 
-        if request.use_rag :
-            res = rag_chat(request.question, request.k, history)
-            answer = res['answer']
-            source = res['sources']
-        else: 
-            answer = simple_chat(request.question, history)
-            source = []
+        res = chat(
+            question=request.question,
+            use_rag=request.use_rag,
+            k=request.k,
+            history=history
+        )
+        answer = res['answer']
+        source = res['sources']
 
         log = AIChatLog(
             user_id=user.id,
@@ -234,7 +235,8 @@ async def set_stream_chat(
     db: AsyncSession = Depends(get_db)
 ):
     async def generate():
-        full_answer =""
+        full_answer = ""  # 只存储回答内容
+        thinking_content = ""  # 思考内容（不存数据库）
         try:
 
             # 1.创建会话
@@ -251,24 +253,37 @@ async def set_stream_chat(
             # 先发送 session_id 给前端
             yield f"session_id:{session_id}\n\n"
 
-            if request.use_rag:
-                stream = stream_rag_chat(request.question, request.k, history)
-            else:
-                stream = simple_stream_chat(request.question, history)
+            # 统一调用 stream_chat
+            stream = stream_chat(
+                question=request.question,
+                use_rag=request.use_rag,
+                k=request.k,
+                history=history
+            )
 
             async for chunk in stream:
-                # chunk 已经包含前缀 (data: 或 think:)，直接发送
-                full_answer += chunk.replace('data:', '').replace('think:', '').replace('think_start:', '').replace('think_end:', '')
+                # 分开处理思考和回答
+                if chunk.startswith('think:'):
+                    thinking_content += chunk[6:]  # 去掉 think: 前缀
+                elif chunk.startswith('think_start:') or chunk.startswith('think_end:'):
+                    pass  # 标记不存储
+                elif chunk.startswith('data:'):
+                    content = chunk[5:]  # 去掉 data: 前缀
+                    full_answer += content
+                else:
+                    full_answer += chunk
                 yield f"{chunk}\n\n"
+
+            # 只存储回答内容到数据库
             log = AIChatLog(
                 user_id = user.id,
                 question = request.question,
-                answer = full_answer
+                answer = full_answer  # 只存回答，不存思考过程
             )
             db.add(log)
             await db.commit()
             await add_message(db, session_id, "user", request.question)
-            await add_message(db, session_id, "assistant", full_answer)
+            await add_message(db, session_id, "assistant", full_answer)  # 只存回答
 
             logger.info(f"用户 {user.id} 流式聊天记录已保存")
 
@@ -279,7 +294,12 @@ async def set_stream_chat(
             yield f"data: {{\"error\": \"{str(e)}\"}}\n\n"
     return StreamingResponse(
         generate(),
-        media_type="text/event-stream"
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive"
+        }
     )
 
 
@@ -344,7 +364,8 @@ async def advanced_stream(
     db: AsyncSession = Depends(get_db)
 ):
     async def generate():
-        full_answer = ''
+        full_answer = ''  # 只存储回答内容
+        thinking_content = ''  # 思考内容（不存数据库）
         try:
             # 获取或创建会话
             if request.session_id:
@@ -369,11 +390,19 @@ async def advanced_stream(
                 use_rerank=request.use_rerank
             )
             async for chunk in result:
-                # chunk 已经包含前缀 (data: 或 think:)，直接发送
-                full_answer += chunk.replace('data:', '').replace('think:', '').replace('think_start:', '').replace('think_end:', '')
+                # 分开处理思考和回答
+                if chunk.startswith('think:'):
+                    thinking_content += chunk[6:]
+                elif chunk.startswith('think_start:') or chunk.startswith('think_end:'):
+                    pass  # 标记不存储
+                elif chunk.startswith('data:'):
+                    content = chunk[5:]
+                    full_answer += content
+                else:
+                    full_answer += chunk
                 yield f"{chunk}\n\n"
 
-            # 保存对话
+            # 只保存回答内容
             await add_message(db, session_id, "user", request.question)
             await add_message(db, session_id, "assistant", full_answer)
 
@@ -384,7 +413,12 @@ async def advanced_stream(
             yield f"data: {{\"error\": \"{str(e)}\"}}\n\n"
     return StreamingResponse(
         generate(),
-        media_type="text/event-stream"
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive"
+        }
     )
 
 
@@ -784,6 +818,11 @@ async def multimodal_stream_endpoint(
 
     return StreamingResponse(
         generate(),
-        media_type="text/event-stream"
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive"
+        }
     )
 

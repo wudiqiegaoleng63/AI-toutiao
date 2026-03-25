@@ -278,28 +278,34 @@
   }
 }
 
-/* 思考内容样式 */
+/* 思考内容样式 - 浅色显示 */
 .message-thinking {
-  background-color: #f8f9fa;
-  border-left: 3px solid #e0e0e0;
+  background-color: #fafafa;
+  border-left: 2px solid #e8e8e8;
   padding: 8px 12px;
   margin-bottom: 10px;
   border-radius: 6px;
-  font-size: 13px;
-  color: #666;
+  font-size: 12px;
+  color: #b8b8b8;
+  max-height: 150px;
+  overflow-y: auto;
 }
 
 .thinking-label {
-  font-size: 12px;
-  color: #999;
+  font-size: 11px;
+  color: #c8c8c8;
   margin-bottom: 6px;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .thinking-text {
-  color: #888;
-  line-height: 1.6;
+  color: #a0a0a0;
+  line-height: 1.5;
   font-style: italic;
+  font-size: 12px;
 }
 
 .thinking-text :global(p) {
@@ -308,4 +314,10 @@
 
 .thinking-text :global(p:last-child) {
   margin-bottom: 0;
+}
+
+/* 回答内容样式 - 更突出 */
+.ai-message .message-text {
+  color: #333;
+  font-size: 14px;
 }
